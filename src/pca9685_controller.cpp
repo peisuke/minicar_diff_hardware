@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/ioctl.h>
+#include <sys/mman.h>
 #include <linux/i2c-dev.h>
 #include <cmath>
 #include <algorithm>
@@ -12,7 +13,7 @@ namespace robot_hardware
 {
 
 PCA9685Controller::PCA9685Controller()
-: i2c_fd_(-1), pca9685_addr_(0x40), max_velocity_rad_per_sec_(3.0)
+: i2c_fd_(-1), pca9685_addr_(0x40), max_velocity_rad_per_sec_(1.0), gpio_map_(nullptr), mem_fd_(-1)
 {
 }
 
@@ -40,6 +41,20 @@ bool PCA9685Controller::initialize(const std::string& i2c_device, uint8_t addres
     return false;
   }
 
+  // GPIO setup for direction control
+  if (!setup_gpio_memory()) {
+    std::cerr << "Failed to setup GPIO memory mapping" << std::endl;
+    close(i2c_fd_);
+    i2c_fd_ = -1;
+    return false;
+  }
+
+  // Configure direction pins as outputs
+  set_gpio_function(RIGHT_MOTOR_DIR_PIN1, 1);
+  set_gpio_function(RIGHT_MOTOR_DIR_PIN2, 1);
+  set_gpio_function(LEFT_MOTOR_DIR_PIN1, 1);
+  set_gpio_function(LEFT_MOTOR_DIR_PIN2, 1);
+
   // PCA9685 初期化
   i2c_write8(MODE1, 0x00);  // 通常モード
   i2c_write8(MODE2, 0x04);  // OUTDRV
@@ -59,6 +74,7 @@ void PCA9685Controller::cleanup()
     close(i2c_fd_);
     i2c_fd_ = -1;
   }
+  cleanup_gpio_memory();
 }
 
 void PCA9685Controller::set_pwm_frequency(float freq_hz)
@@ -98,15 +114,17 @@ void PCA9685Controller::stop_all_motors()
 {
   if (i2c_fd_ < 0) return;
   
-  // 右モーター停止
-  set_channel_pwm(R_IN1, 0);
-  set_channel_pwm(R_IN2, 0);
-  set_channel_pwm(PWM_R, 0);
+  // PWM停止
+  set_channel_pwm(RIGHT_MOTOR_PWM_CH, 0);
+  set_channel_pwm(LEFT_MOTOR_PWM_CH, 0);
   
-  // 左モーター停止
-  set_channel_pwm(L_IN1, 0);
-  set_channel_pwm(L_IN2, 0);
-  set_channel_pwm(PWM_L, 0);
+  // 方向ピンを停止状態に
+  if (gpio_map_) {
+    gpio_write(RIGHT_MOTOR_DIR_PIN1, 0);
+    gpio_write(RIGHT_MOTOR_DIR_PIN2, 0);
+    gpio_write(LEFT_MOTOR_DIR_PIN1, 0);
+    gpio_write(LEFT_MOTOR_DIR_PIN2, 0);
+  }
 }
 
 void PCA9685Controller::i2c_write8(uint8_t reg, uint8_t value)
@@ -164,20 +182,93 @@ uint16_t PCA9685Controller::velocity_to_pwm_duty(double velocity_rad_per_sec)
 
 void PCA9685Controller::set_motor_direction_and_speed(int motor_index, double velocity)
 {
-  if (i2c_fd_ < 0) return;
+  if (i2c_fd_ < 0 || !gpio_map_) return;
   
   uint16_t pwm_duty = velocity_to_pwm_duty(velocity);
   bool forward = velocity >= 0;
   
   if (motor_index == 0) { // 右モーター
-    set_channel_pwm(R_IN1, forward ? 4095 : 0);
-    set_channel_pwm(R_IN2, forward ? 0 : 4095);
-    set_channel_pwm(PWM_R, pwm_duty);
+    // GPIO方向制御
+    gpio_write(RIGHT_MOTOR_DIR_PIN1, forward ? 1 : 0);
+    gpio_write(RIGHT_MOTOR_DIR_PIN2, forward ? 0 : 1);
+    // PCA9685 PWM制御
+    set_channel_pwm(RIGHT_MOTOR_PWM_CH, pwm_duty);
   }
-  else if (motor_index == 1) { // 左モーター
-    set_channel_pwm(L_IN1, forward ? 4095 : 0);
-    set_channel_pwm(L_IN2, forward ? 0 : 4095);
-    set_channel_pwm(PWM_L, pwm_duty);
+  else if (motor_index == 1) { // 左モーター  
+    // GPIO方向制御
+    gpio_write(LEFT_MOTOR_DIR_PIN1, forward ? 1 : 0);
+    gpio_write(LEFT_MOTOR_DIR_PIN2, forward ? 0 : 1);
+    // PCA9685 PWM制御
+    set_channel_pwm(LEFT_MOTOR_PWM_CH, pwm_duty);
+  }
+}
+
+bool PCA9685Controller::setup_gpio_memory()
+{
+  // Open /dev/gpiomem
+  mem_fd_ = open("/dev/gpiomem", O_RDWR | O_SYNC);
+  if (mem_fd_ < 0) {
+    std::cerr << "Failed to open /dev/gpiomem" << std::endl;
+    return false;
+  }
+  
+  // Memory map GPIO registers
+  gpio_map_ = (volatile uint32_t*)mmap(
+    nullptr,           // Any address
+    GPIO_LENGTH,       // Size of mapping
+    PROT_READ | PROT_WRITE, // Read/Write access
+    MAP_SHARED,        // Shared mapping
+    mem_fd_,          // File descriptor
+    GPIO_BASE          // Offset
+  );
+  
+  if (gpio_map_ == MAP_FAILED) {
+    std::cerr << "Failed to mmap GPIO memory" << std::endl;
+    close(mem_fd_);
+    mem_fd_ = -1;
+    return false;
+  }
+  
+  return true;
+}
+
+void PCA9685Controller::cleanup_gpio_memory()
+{
+  if (gpio_map_) {
+    munmap((void*)gpio_map_, GPIO_LENGTH);
+    gpio_map_ = nullptr;
+  }
+  
+  if (mem_fd_ >= 0) {
+    close(mem_fd_);
+    mem_fd_ = -1;
+  }
+}
+
+void PCA9685Controller::set_gpio_function(int pin, int function)
+{
+  if (!gpio_map_) return;
+  
+  int reg_index = pin / 10;
+  int bit_offset = (pin % 10) * 3;
+  
+  // Clear the 3 bits for this pin
+  gpio_map_[reg_index] &= ~(7 << bit_offset);
+  
+  // Set the function (1 = output, 0 = input)
+  gpio_map_[reg_index] |= (function & 7) << bit_offset;
+}
+
+void PCA9685Controller::gpio_write(int pin, int value)
+{
+  if (!gpio_map_) return;
+  
+  if (value) {
+    // Set pin HIGH using GPSET0 register
+    gpio_map_[GPSET0] = 1 << pin;
+  } else {
+    // Set pin LOW using GPCLR0 register  
+    gpio_map_[GPCLR0] = 1 << pin;
   }
 }
 

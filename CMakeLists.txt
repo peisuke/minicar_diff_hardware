@@ -53,7 +53,7 @@ target_include_directories(minicar_hardware_interface PRIVATE
 )
 
 target_link_libraries(minicar_hardware_interface
-  gpio_motor_controller
+  pca9685_controller
 )
 
 ament_target_dependencies(minicar_hardware_interface

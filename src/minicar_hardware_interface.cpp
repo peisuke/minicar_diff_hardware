@@ -1,5 +1,5 @@
 #include "robot_hardware/minicar_hardware_interface.hpp"
-#include "robot_hardware/gpio_motor_controller.hpp"
+#include "robot_hardware/pca9685_controller.hpp"
 
 #include <chrono>
 #include <cmath>
@@ -73,7 +73,7 @@ hardware_interface::CallbackReturn MinicarHardwareInterface::on_init(
   }
 
   // GPIOモーターコントローラー初期化
-  gpio_controller_ = std::make_unique<GPIOMotorController>();
+  pca9685_controller_ = std::make_unique<PCA9685Controller>();
   
   return hardware_interface::CallbackReturn::SUCCESS;
 }
@@ -142,9 +142,9 @@ hardware_interface::CallbackReturn MinicarHardwareInterface::on_activate(
     hw_commands_[i] = 0;
   }
   
-  if (gpio_controller_ && gpio_controller_->is_initialized())
+  if (pca9685_controller_ && pca9685_controller_->is_initialized())
   {
-    gpio_controller_->stop_all_motors();
+    pca9685_controller_->stop_all_motors();
   }
 
   RCLCPP_INFO(rclcpp::get_logger("MinicarHardwareInterface"), "Successfully activated!");
@@ -158,9 +158,9 @@ hardware_interface::CallbackReturn MinicarHardwareInterface::on_deactivate(
   RCLCPP_INFO(rclcpp::get_logger("MinicarHardwareInterface"), "Deactivating ...please wait...");
   
   // モーター停止
-  if (gpio_controller_ && gpio_controller_->is_initialized())
+  if (pca9685_controller_ && pca9685_controller_->is_initialized())
   {
-    gpio_controller_->stop_all_motors();
+    pca9685_controller_->stop_all_motors();
   }
 
   RCLCPP_INFO(rclcpp::get_logger("MinicarHardwareInterface"), "Successfully deactivated!");
@@ -192,7 +192,7 @@ hardware_interface::return_type MinicarHardwareInterface::write(
   const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/)
 {
   // モーター制御コマンド適用
-  if (gpio_controller_ && gpio_controller_->is_initialized())
+  if (pca9685_controller_ && pca9685_controller_->is_initialized())
   {
     // 左右のモーターに速度を設定
     // joint順序: left_front_wheel_joint, right_front_wheel_joint, left_rear_wheel_joint, right_rear_wheel_joint
@@ -203,8 +203,8 @@ hardware_interface::return_type MinicarHardwareInterface::write(
       // 右モーター (前輪と後輪の平均)  
       double right_velocity = (hw_commands_[1] + hw_commands_[3]) / 2.0; // right_front + right_rear
       
-      gpio_controller_->set_motor_speed(0, right_velocity);  // 右モーター
-      gpio_controller_->set_motor_speed(1, left_velocity);   // 左モーター
+      pca9685_controller_->set_motor_speed(0, right_velocity);  // 右モーター
+      pca9685_controller_->set_motor_speed(1, left_velocity);   // 左モーター
     }
   }
 
@@ -213,15 +213,15 @@ hardware_interface::return_type MinicarHardwareInterface::write(
 
 bool MinicarHardwareInterface::initialize_hardware()
 {
-  if (!gpio_controller_)
+  if (!pca9685_controller_)
   {
     RCLCPP_ERROR(rclcpp::get_logger("MinicarHardwareInterface"), "GPIO controller not created");
     return false;
   }
   
-  if (!gpio_controller_->initialize())
+  if (!pca9685_controller_->initialize(i2c_device_, pca9685_address_))
   {
-    RCLCPP_ERROR(rclcpp::get_logger("MinicarHardwareInterface"), "Failed to initialize GPIO");
+    RCLCPP_ERROR(rclcpp::get_logger("MinicarHardwareInterface"), "Failed to initialize PCA9685");
     return false;
   }
   
@@ -231,9 +231,9 @@ bool MinicarHardwareInterface::initialize_hardware()
 
 void MinicarHardwareInterface::cleanup_hardware()
 {
-  if (gpio_controller_)
+  if (pca9685_controller_)
   {
-    gpio_controller_->cleanup();
+    pca9685_controller_->cleanup();
   }
 }
 

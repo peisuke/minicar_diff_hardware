@@ -33,16 +33,29 @@ private:
   static const uint8_t PRESCALE = 0xFE;
   static const uint8_t LED0_ON_L = 0x06;
   
-  // モーターチャンネル設定
-  static const int PWM_R = 0;  // Right motor speed
-  static const int R_IN1 = 1;
-  static const int R_IN2 = 2;
-  static const int PWM_L = 5;  // Left motor speed  
-  static const int L_IN1 = 3;
-  static const int L_IN2 = 4;
+  // モーターチャンネル設定 (OSOYOO PWM HAT V2.0)
+  static const int RIGHT_MOTOR_PWM_CH = 0;  // Channel 0 for right motor PWM
+  static const int LEFT_MOTOR_PWM_CH = 1;   // Channel 1 for left motor PWM
+  
+  // 方向制御は引き続きGPIO使用
+  static const int RIGHT_MOTOR_DIR_PIN1 = 23;
+  static const int RIGHT_MOTOR_DIR_PIN2 = 24;
+  static const int LEFT_MOTOR_DIR_PIN1 = 27;
+  static const int LEFT_MOTOR_DIR_PIN2 = 22;
   
   // 制御パラメータ
   double max_velocity_rad_per_sec_;
+  
+  // GPIO制御用 (方向制御のため)
+  volatile uint32_t* gpio_map_;
+  int mem_fd_;
+  static constexpr size_t GPIO_BASE = 0x00000000;
+  static constexpr size_t GPIO_LENGTH = 0xB4;
+  static constexpr int GPFSEL0 = 0;
+  static constexpr int GPFSEL1 = 1;
+  static constexpr int GPFSEL2 = 2;
+  static constexpr int GPSET0 = 7;
+  static constexpr int GPCLR0 = 10;
   
   // I2C通信ヘルパー
   void i2c_write8(uint8_t reg, uint8_t value);
@@ -52,6 +65,12 @@ private:
   // モーター制御ヘルパー
   uint16_t velocity_to_pwm_duty(double velocity_rad_per_sec);
   void set_motor_direction_and_speed(int motor_index, double velocity);
+  
+  // GPIO制御ヘルパー
+  bool setup_gpio_memory();
+  void cleanup_gpio_memory();
+  void set_gpio_function(int pin, int function);
+  void gpio_write(int pin, int value);
 };
 
 } // namespace robot_hardware
