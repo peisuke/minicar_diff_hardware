@@ -20,11 +20,26 @@ add_library(pca9685_controller SHARED
   src/pca9685_controller.cpp
 )
 
+# Create GPIO motor controller library
+add_library(gpio_motor_controller SHARED
+  src/gpio_motor_controller.cpp
+)
+
 target_include_directories(pca9685_controller PRIVATE
   include
 )
 
+target_include_directories(gpio_motor_controller PRIVATE
+  include
+)
+
+# No external libraries needed for sysfs GPIO
+
 ament_target_dependencies(pca9685_controller
+  rclcpp
+)
+
+ament_target_dependencies(gpio_motor_controller
   rclcpp
 )
 
@@ -38,7 +53,7 @@ target_include_directories(minicar_hardware_interface PRIVATE
 )
 
 target_link_libraries(minicar_hardware_interface
-  pca9685_controller
+  gpio_motor_controller
 )
 
 ament_target_dependencies(minicar_hardware_interface
@@ -52,7 +67,7 @@ ament_target_dependencies(minicar_hardware_interface
 pluginlib_export_plugin_description_file(hardware_interface minicar_hardware_interface_plugin.xml)
 
 # Install libraries
-install(TARGETS minicar_hardware_interface pca9685_controller
+install(TARGETS minicar_hardware_interface pca9685_controller gpio_motor_controller
   EXPORT export_minicar_hardware_interface
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
@@ -72,6 +87,11 @@ install(DIRECTORY launch/
 # Install config files
 install(DIRECTORY config/
   DESTINATION share/${PROJECT_NAME}/config/
+)
+
+# Install urdf files
+install(DIRECTORY urdf/
+  DESTINATION share/${PROJECT_NAME}/urdf/
 )
 
 # Install plugin description file

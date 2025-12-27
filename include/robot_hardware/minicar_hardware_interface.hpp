@@ -53,8 +53,8 @@ private:
   std::vector<long> encoder_counts_;
   std::vector<double> last_encoder_positions_;
   
-  // PCA9685制御用
-  std::unique_ptr<class PCA9685Controller> pca9685_;
+  // GPIO制御用
+  std::unique_ptr<class GPIOMotorController> gpio_controller_;
   
   // ハードウェア初期化・制御関数
   bool initialize_hardware();
