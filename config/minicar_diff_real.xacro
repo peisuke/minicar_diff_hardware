@@ -1,0 +1,56 @@
+<?xml version="1.0"?>
+<robot name="minicar_diff_real" xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!-- Include base URDF -->
+  <xacro:include filename="$(find minicar_project)/robot_description/urdf/minicar_diff_gazebo.xacro" />
+
+  <!-- Real hardware interface (replace Gazebo plugin) -->
+  <ros2_control name="RealSystem" type="system">
+    <hardware>
+      <plugin>minicar_diff_hardware/MinicarHardwareInterface</plugin>
+      <param name="wheel_radius">0.035</param>
+      <param name="encoder_ticks_per_revolution">1024</param>
+      
+      <!-- I2C/PCA9685 configuration -->
+      <param name="i2c_device">/dev/i2c-1</param>
+      <param name="pca9685_address">64</param>
+    </hardware>
+    
+    <joint name="left_front_wheel_joint">
+      <command_interface name="velocity">
+        <param name="min">-10.0</param>
+        <param name="max">10.0</param>
+      </command_interface>
+      <state_interface name="velocity"/>
+      <state_interface name="position"/>
+    </joint>
+    
+    <joint name="right_front_wheel_joint">
+      <command_interface name="velocity">
+        <param name="min">-10.0</param>
+        <param name="max">10.0</param>
+      </command_interface>
+      <state_interface name="velocity"/>
+      <state_interface name="position"/>
+    </joint>
+    
+    <joint name="left_rear_wheel_joint">
+      <command_interface name="velocity">
+        <param name="min">-10.0</param>
+        <param name="max">10.0</param>
+      </command_interface>
+      <state_interface name="velocity"/>
+      <state_interface name="position"/>
+    </joint>
+    
+    <joint name="right_rear_wheel_joint">
+      <command_interface name="velocity">
+        <param name="min">-10.0</param>
+        <param name="max">10.0</param>
+      </command_interface>
+      <state_interface name="velocity"/>
+      <state_interface name="position"/>
+    </joint>
+  </ros2_control>
+
+</robot>

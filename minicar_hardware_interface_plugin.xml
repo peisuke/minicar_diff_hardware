@@ -1,0 +1,9 @@
+<library path="minicar_hardware_interface">
+  <class name="minicar_diff_hardware/MinicarHardwareInterface" 
+         type="robot_hardware::MinicarHardwareInterface" 
+         base_class_type="hardware_interface::SystemInterface">
+    <description>
+      Minicar hardware interface for Raspberry Pi GPIO control
+    </description>
+  </class>
+</library>
