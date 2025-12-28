@@ -10,6 +10,12 @@ from launch_ros.parameter_descriptions import ParameterValue
 def generate_launch_description():
     
     # Launch arguments
+    robot_ns_arg = DeclareLaunchArgument(
+        'robot_ns',
+        default_value='real_robot',
+        description='Robot namespace'
+    )
+    
     use_sim_time_arg = DeclareLaunchArgument(
         'use_sim_time',
         default_value='false',
@@ -17,6 +23,7 @@ def generate_launch_description():
     )
     
     # Launch configurations
+    robot_ns = LaunchConfiguration('robot_ns')
     use_sim_time = LaunchConfiguration('use_sim_time')
     
     # URDF/XACRO file for hardware
@@ -25,7 +32,7 @@ def generate_launch_description():
         'config', 'minicar_diff_real.xacro'
     ])
     
-    robot_description = ParameterValue(Command(['xacro ', xacro_file]), value_type=str)
+    robot_description = ParameterValue(Command(['xacro ', xacro_file, ' robot_ns:=', robot_ns]), value_type=str)
     
     # Hardware config file
     hardware_config = PathJoinSubstitution([
@@ -34,6 +41,7 @@ def generate_launch_description():
     ])
     
     return LaunchDescription([
+        robot_ns_arg,
         use_sim_time_arg,
         
         # Robot State Publisher
@@ -41,6 +49,7 @@ def generate_launch_description():
             package='robot_state_publisher',
             executable='robot_state_publisher',
             name='robot_state_publisher',
+            namespace=robot_ns,
             output='screen',
             parameters=[{
                 'robot_description': robot_description,
@@ -52,6 +61,7 @@ def generate_launch_description():
         Node(
             package='controller_manager',
             executable='ros2_control_node',
+            namespace=robot_ns,
             output='screen',
             parameters=[
                 hardware_config,
@@ -64,7 +74,7 @@ def generate_launch_description():
         Node(
             package="controller_manager",
             executable="spawner",
-            arguments=["joint_state_broadcaster", "--controller-manager", "/controller_manager"],
+            arguments=["joint_state_broadcaster", "--controller-manager", ["/", robot_ns, "/controller_manager"]],
             output="screen",
             parameters=[{'use_sim_time': use_sim_time}]
         ),
@@ -73,7 +83,7 @@ def generate_launch_description():
         Node(
             package='controller_manager', 
             executable='spawner',
-            arguments=['diff_drive_controller', '--controller-manager', '/controller_manager'],
+            arguments=['diff_drive_controller', '--controller-manager', ["/", robot_ns, "/controller_manager"]],
             output='screen',
             parameters=[{'use_sim_time': use_sim_time}]
         ),

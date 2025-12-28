@@ -10,6 +10,12 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 def generate_launch_description():
     
     # Launch arguments
+    robot_ns_arg = DeclareLaunchArgument(
+        'robot_ns',
+        default_value='real_robot',
+        description='Robot namespace'
+    )
+    
     use_sim_time_arg = DeclareLaunchArgument(
         'use_sim_time',
         default_value='false',
@@ -23,10 +29,12 @@ def generate_launch_description():
     )
     
     # Launch configurations
+    robot_ns = LaunchConfiguration('robot_ns')
     use_sim_time = LaunchConfiguration('use_sim_time')
     rplidar_serial_port = LaunchConfiguration('rplidar_serial_port')
     
     return LaunchDescription([
+        robot_ns_arg,
         use_sim_time_arg,
         rplidar_serial_port_arg,
         
@@ -35,12 +43,13 @@ def generate_launch_description():
             package='robot_state_publisher',
             executable='robot_state_publisher',
             name='robot_state_publisher',
+            namespace=robot_ns,
             output='screen',
             parameters=[{
                 'use_sim_time': use_sim_time,
                 'robot_description': PathJoinSubstitution([
-                    FindPackageShare('minicar_project'),
-                    'robot_hardware', 'config', 'minicar_diff_real.xacro'
+                    FindPackageShare('minicar_diff_hardware'),
+                    'config', 'minicar_diff_real.xacro'
                 ])
             }]
         ),
@@ -50,11 +59,12 @@ def generate_launch_description():
             package='controller_manager',
             executable='ros2_control_node',
             name='controller_manager',
+            namespace=robot_ns,
             output='screen',
             parameters=[
                 PathJoinSubstitution([
-                    FindPackageShare('minicar_project'),
-                    'robot_hardware', 'config', 'minicar_hardware_config.yaml'
+                    FindPackageShare('minicar_diff_hardware'),
+                    'config', 'minicar_hardware_config.yaml'
                 ]),
                 {'use_sim_time': use_sim_time}
             ]
@@ -64,7 +74,7 @@ def generate_launch_description():
         Node(
             package='controller_manager',
             executable='spawner',
-            arguments=['joint_state_broadcaster'],
+            arguments=['joint_state_broadcaster', '--controller-manager', ["/", robot_ns, "/controller_manager"]],
             output='screen',
             parameters=[{'use_sim_time': use_sim_time}]
         ),
@@ -73,7 +83,7 @@ def generate_launch_description():
         Node(
             package='controller_manager', 
             executable='spawner',
-            arguments=['diff_drive_controller'],
+            arguments=['diff_drive_controller', '--controller-manager', ["/", robot_ns, "/controller_manager"]],
             output='screen',
             parameters=[{'use_sim_time': use_sim_time}]
         ),

@@ -1,6 +1,9 @@
 <?xml version="1.0"?>
 <robot name="minicar_diff_real" xmlns:xacro="http://www.ros.org/wiki/xacro">
 
+  <!-- Launch arguments -->
+  <xacro:arg name="robot_ns" default="real_robot"/>
+
   <!-- Minimal robot structure for hardware interface -->
   <link name="base_link"/>
   <link name="left_front_wheel"/>
