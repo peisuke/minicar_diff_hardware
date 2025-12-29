@@ -183,6 +183,14 @@ uint16_t PCA9685Controller::velocity_to_pwm_duty(double velocity_rad_per_sec)
   }
 
   double abs_velocity = std::abs(velocity_rad_per_sec);
+  
+  // Deadzone: 微小速度でのモーター音を防ぐため、最小閾値以下は停止
+  const double MIN_VELOCITY_THRESHOLD = 0.1; // 0.1 rad/s以下は停止
+  if (abs_velocity < MIN_VELOCITY_THRESHOLD)
+  {
+    return 0;
+  }
+  
   double normalized = std::min(abs_velocity / max_velocity_rad_per_sec_, 1.0);
   return static_cast<uint16_t>(4095 * normalized);
 }
