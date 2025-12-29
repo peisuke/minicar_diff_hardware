@@ -37,6 +37,10 @@
       <param name="max_velocity_rad_per_sec">21.0</param>  <!-- 6V equivalent scaling for safe operation -->
       <param name="i2c_device">/dev/i2c-1</param>
       <param name="pca9685_address">64</param>
+      
+      <!-- Open-loop odometry (no encoders) -->
+      <param name="use_open_loop_odometry">true</param>     <!-- Enable open-loop estimation for /odom -->
+      <param name="open_loop_velocity_scale">1.0</param>   <!-- Scale factor for velocity correction -->
     </hardware>
     <!--
     <hardware>

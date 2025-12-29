@@ -57,8 +57,53 @@ hardware_interface::CallbackReturn MinicarHardwareInterface::on_init(
   }
   
   // Velocity scaling parameter (default: 20.0 rad/s for safe operation)
-  max_velocity_rad_per_sec_ = info_.hardware_parameters.count("max_velocity_rad_per_sec") ?
-                              std::stod(info_.hardware_parameters["max_velocity_rad_per_sec"]) : 20.0;
+  try
+  {
+    max_velocity_rad_per_sec_ = info_.hardware_parameters.count("max_velocity_rad_per_sec") ?
+                                std::stod(info_.hardware_parameters.at("max_velocity_rad_per_sec")) : 20.0;
+  }
+  catch (const std::exception & e)
+  {
+    RCLCPP_FATAL(
+      rclcpp::get_logger("MinicarHardwareInterface"),
+      "Failed to parse 'max_velocity_rad_per_sec' (must be a number > 0): %s",
+      e.what());
+    return hardware_interface::CallbackReturn::ERROR;
+  }
+
+  // ---- Open-loop odometry params (no encoders) ----
+  // use_open_loop_odometry: "true/false" or "1/0"
+  if (info_.hardware_parameters.count("use_open_loop_odometry"))
+  {
+    const auto & v = info_.hardware_parameters.at("use_open_loop_odometry");
+    use_open_loop_odometry_ = (v == "true" || v == "True" || v == "1");
+  }
+  else
+  {
+    // Default true for your current hardware (2-wire motors, no encoders)
+    use_open_loop_odometry_ = true;
+  }
+
+  // open_loop_velocity_scale: numeric > 0 (default 1.0)
+  if (info_.hardware_parameters.count("open_loop_velocity_scale"))
+  {
+    try
+    {
+      open_loop_velocity_scale_ = std::stod(info_.hardware_parameters.at("open_loop_velocity_scale"));
+    }
+    catch (const std::exception & e)
+    {
+      RCLCPP_FATAL(rclcpp::get_logger("MinicarHardwareInterface"),
+        "Failed to parse 'open_loop_velocity_scale' (must be a number > 0): %s", e.what());
+      return hardware_interface::CallbackReturn::ERROR;
+    }
+    if (!(open_loop_velocity_scale_ > 0.0) || !std::isfinite(open_loop_velocity_scale_))
+    {
+      RCLCPP_FATAL(rclcpp::get_logger("MinicarHardwareInterface"),
+        "Invalid open_loop_velocity_scale: %f (must be finite and > 0).", open_loop_velocity_scale_);
+      return hardware_interface::CallbackReturn::ERROR;
+    }
+  }
   
   // I2C/PCA9685設定読み込み
   i2c_device_ = info_.hardware_parameters.count("i2c_device") ? 
@@ -242,18 +287,38 @@ hardware_interface::CallbackReturn MinicarHardwareInterface::on_deactivate(
 hardware_interface::return_type MinicarHardwareInterface::read(
   const rclcpp::Time & /*time*/, const rclcpp::Duration & period)
 {
-  // エンコーダー読み取り
-  read_encoders();
-  
-  // 位置・速度計算
-  for (size_t i = 0; i < encoder_counts_.size(); i++)
+  const double dt = period.seconds();
+  if (!(dt > 0.0) || !std::isfinite(dt))
   {
-    double position = encoder_counts_to_radians(encoder_counts_[i]);
-    double velocity = (position - last_encoder_positions_[i]) / period.seconds();
-    
-    hw_positions_[i] = position;
-    hw_velocities_[i] = velocity;
-    last_encoder_positions_[i] = position;
+    return hardware_interface::return_type::OK;
+  }
+
+  if (use_open_loop_odometry_)
+  {
+    // Open-loop: generate joint states from commands (no encoders).
+    // This enables diff_drive_controller to publish /odom, but it is only an estimate.
+    for (size_t i = 0; i < hw_commands_.size(); ++i)
+    {
+      const double v = hw_commands_[i] * open_loop_velocity_scale_;
+      hw_velocities_[i] = v;
+      hw_positions_[i] += v * dt;
+      last_encoder_positions_[i] = hw_positions_[i]; // keep consistency if you ever switch modes
+    }
+  }
+  else
+  {
+    // Encoder-based (future)
+    read_encoders();
+
+    for (size_t i = 0; i < encoder_counts_.size(); i++)
+    {
+      double position = encoder_counts_to_radians(encoder_counts_[i]);
+      double velocity = (position - last_encoder_positions_[i]) / dt;
+
+      hw_positions_[i] = position;
+      hw_velocities_[i] = velocity;
+      last_encoder_positions_[i] = position;
+    }
   }
 
   return hardware_interface::return_type::OK;
