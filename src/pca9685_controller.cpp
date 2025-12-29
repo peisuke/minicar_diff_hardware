@@ -1,6 +1,7 @@
 #include "robot_hardware/pca9685_controller.hpp"
 
 #include <iostream>
+#include <limits>
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/ioctl.h>
@@ -175,6 +176,12 @@ void PCA9685Controller::pca9685_set_pwm(int channel, uint16_t on, uint16_t off)
 uint16_t PCA9685Controller::velocity_to_pwm_duty(double velocity_rad_per_sec)
 {
   // 速度の絶対値を0-4095のPWMデューティに変換
+  // Guard against invalid scaling to avoid division-by-zero / NaN.
+  if (!(max_velocity_rad_per_sec_ > 0.0) || !std::isfinite(max_velocity_rad_per_sec_))
+  {
+    return 0;
+  }
+
   double abs_velocity = std::abs(velocity_rad_per_sec);
   double normalized = std::min(abs_velocity / max_velocity_rad_per_sec_, 1.0);
   return static_cast<uint16_t>(4095 * normalized);

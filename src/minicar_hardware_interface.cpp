@@ -1,6 +1,7 @@
 #include "robot_hardware/minicar_hardware_interface.hpp"
 #include "robot_hardware/pca9685_controller.hpp"
 
+#include <stdexcept>
 #include <chrono>
 #include <cmath>
 #include <limits>
@@ -21,9 +22,39 @@ hardware_interface::CallbackReturn MinicarHardwareInterface::on_init(
     return hardware_interface::CallbackReturn::ERROR;
   }
 
-  // パラメータ読み込み
-  wheel_radius_ = std::stod(info_.hardware_parameters["wheel_radius"]);
-  encoder_ticks_per_revolution_ = std::stod(info_.hardware_parameters["encoder_ticks_per_revolution"]);
+  // ---- Required parameters (fail fast with clear message) ----
+  auto require_param = [&](const std::string & key) -> bool {
+    if (info_.hardware_parameters.count(key) == 0)
+    {
+      RCLCPP_FATAL(
+        rclcpp::get_logger("MinicarHardwareInterface"),
+        "Missing required hardware parameter '%s'. Please set it in <ros2_control><hardware><param name=\"%s\">...</param>.",
+        key.c_str(), key.c_str());
+      return false;
+    }
+    return true;
+  };
+
+  if (!require_param("wheel_radius") ||
+      !require_param("encoder_ticks_per_revolution"))
+  {
+    return hardware_interface::CallbackReturn::ERROR;
+  }
+
+  // ---- Parse required parameters with error handling ----
+  try
+  {
+    wheel_radius_ = std::stod(info_.hardware_parameters.at("wheel_radius"));
+    encoder_ticks_per_revolution_ = std::stod(info_.hardware_parameters.at("encoder_ticks_per_revolution"));
+  }
+  catch (const std::exception & e)
+  {
+    RCLCPP_FATAL(
+      rclcpp::get_logger("MinicarHardwareInterface"),
+      "Failed to parse required hardware parameters (wheel_radius / encoder_ticks_per_revolution): %s",
+      e.what());
+    return hardware_interface::CallbackReturn::ERROR;
+  }
   
   // Velocity scaling parameter (default: 20.0 rad/s for safe operation)
   max_velocity_rad_per_sec_ = info_.hardware_parameters.count("max_velocity_rad_per_sec") ?
@@ -32,8 +63,20 @@ hardware_interface::CallbackReturn MinicarHardwareInterface::on_init(
   // I2C/PCA9685設定読み込み
   i2c_device_ = info_.hardware_parameters.count("i2c_device") ? 
                 info_.hardware_parameters["i2c_device"] : "/dev/i2c-1";
-  pca9685_address_ = info_.hardware_parameters.count("pca9685_address") ? 
-                     std::stoi(info_.hardware_parameters["pca9685_address"]) : 0x40;
+  // NOTE: base=0 allows "64", "0x40", "0100" etc.
+  try
+  {
+    pca9685_address_ = info_.hardware_parameters.count("pca9685_address") ?
+                       std::stoi(info_.hardware_parameters.at("pca9685_address"), nullptr, 0) : 0x40;
+  }
+  catch (const std::exception & e)
+  {
+    RCLCPP_FATAL(
+      rclcpp::get_logger("MinicarHardwareInterface"),
+      "Failed to parse 'pca9685_address' (supports decimal or hex like 0x40): %s",
+      e.what());
+    return hardware_interface::CallbackReturn::ERROR;
+  }
 
   // ジョイント情報設定
   joint_names_.clear();
@@ -87,6 +130,13 @@ hardware_interface::CallbackReturn MinicarHardwareInterface::on_configure(
 {
   RCLCPP_INFO(rclcpp::get_logger("MinicarHardwareInterface"), "Configuring ...please wait...");
 
+  if (!pca9685_controller_)
+  {
+    RCLCPP_FATAL(rclcpp::get_logger("MinicarHardwareInterface"),
+                 "PCA9685Controller is not created (pca9685_controller_ is null).");
+    return hardware_interface::CallbackReturn::ERROR;
+  }
+
   // GPIO初期化
   if (!initialize_hardware())
   {
@@ -95,6 +145,13 @@ hardware_interface::CallbackReturn MinicarHardwareInterface::on_configure(
   }
   
   // Inject velocity scaling parameter to PCA9685Controller
+  if (!pca9685_controller_->is_initialized())
+  {
+    RCLCPP_FATAL(rclcpp::get_logger("MinicarHardwareInterface"),
+                 "PCA9685Controller is not initialized after initialize_hardware().");
+    return hardware_interface::CallbackReturn::ERROR;
+  }
+
   if (!pca9685_controller_->set_max_velocity_rad_per_sec(max_velocity_rad_per_sec_))
   {
     RCLCPP_ERROR(rclcpp::get_logger("MinicarHardwareInterface"), 
