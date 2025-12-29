@@ -34,6 +34,7 @@
       <plugin>minicar_diff_hardware/MinicarHardwareInterface</plugin>
       <param name="wheel_radius">0.035</param>
       <param name="encoder_ticks_per_revolution">1024</param>
+      <param name="max_velocity_rad_per_sec">21.0</param>  <!-- 6V equivalent scaling for safe operation -->
       <param name="i2c_device">/dev/i2c-1</param>
       <param name="pca9685_address">64</param>
     </hardware>

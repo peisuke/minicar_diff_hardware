@@ -21,6 +21,9 @@ public:
   void set_channel_pwm(int channel, uint16_t duty);
   void set_motor_speed(int motor_index, double velocity_rad_per_sec);
   void stop_all_motors();
+  
+  // Velocity scaling parameter setter
+  bool set_max_velocity_rad_per_sec(double max_velocity);
 
 private:
   // I2C通信

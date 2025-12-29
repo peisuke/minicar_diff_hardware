@@ -272,4 +272,17 @@ void PCA9685Controller::gpio_write(int pin, int value)
   }
 }
 
+bool PCA9685Controller::set_max_velocity_rad_per_sec(double max_velocity)
+{
+  if (max_velocity <= 0.0) {
+    std::cerr << "Invalid max_velocity_rad_per_sec: " << max_velocity 
+              << " (must be > 0)" << std::endl;
+    return false;
+  }
+  
+  max_velocity_rad_per_sec_ = max_velocity;
+  std::cout << "Updated max_velocity_rad_per_sec to: " << max_velocity_rad_per_sec_ << std::endl;
+  return true;
+}
+
 } // namespace robot_hardware

@@ -25,6 +25,10 @@ hardware_interface::CallbackReturn MinicarHardwareInterface::on_init(
   wheel_radius_ = std::stod(info_.hardware_parameters["wheel_radius"]);
   encoder_ticks_per_revolution_ = std::stod(info_.hardware_parameters["encoder_ticks_per_revolution"]);
   
+  // Velocity scaling parameter (default: 20.0 rad/s for safe operation)
+  max_velocity_rad_per_sec_ = info_.hardware_parameters.count("max_velocity_rad_per_sec") ?
+                              std::stod(info_.hardware_parameters["max_velocity_rad_per_sec"]) : 20.0;
+  
   // I2C/PCA9685設定読み込み
   i2c_device_ = info_.hardware_parameters.count("i2c_device") ? 
                 info_.hardware_parameters["i2c_device"] : "/dev/i2c-1";
@@ -89,6 +93,16 @@ hardware_interface::CallbackReturn MinicarHardwareInterface::on_configure(
     RCLCPP_FATAL(rclcpp::get_logger("MinicarHardwareInterface"), "Failed to initialize hardware");
     return hardware_interface::CallbackReturn::ERROR;
   }
+  
+  // Inject velocity scaling parameter to PCA9685Controller
+  if (!pca9685_controller_->set_max_velocity_rad_per_sec(max_velocity_rad_per_sec_))
+  {
+    RCLCPP_ERROR(rclcpp::get_logger("MinicarHardwareInterface"), 
+                 "Failed to set max_velocity_rad_per_sec: %f", max_velocity_rad_per_sec_);
+    return hardware_interface::CallbackReturn::ERROR;
+  }
+  RCLCPP_INFO(rclcpp::get_logger("MinicarHardwareInterface"), 
+              "Velocity scaling configured: max_velocity_rad_per_sec = %f", max_velocity_rad_per_sec_);
 
   // 初期値設定
   for (size_t i = 0; i < hw_commands_.size(); i++)

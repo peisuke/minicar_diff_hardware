@@ -65,6 +65,7 @@ private:
   // パラメータ
   double wheel_radius_;
   double encoder_ticks_per_revolution_;
+  double max_velocity_rad_per_sec_;  // Velocity scaling parameter
   std::vector<std::string> joint_names_;
   std::string i2c_device_;
   uint8_t pca9685_address_;
