@@ -65,9 +65,16 @@ private:
   // パラメータ
   double wheel_radius_;
   double encoder_ticks_per_revolution_;
+  double max_velocity_rad_per_sec_;  // Velocity scaling parameter
   std::vector<std::string> joint_names_;
   std::string i2c_device_;
   uint8_t pca9685_address_;
+  
+  // No-encoder setup: generate wheel states from commands to enable /odom (open-loop)
+  bool use_open_loop_odometry_{true};
+  
+  // Optional scaling to compensate systematic mismatch between commanded rad/s and actual wheel speed
+  double open_loop_velocity_scale_{1.0};
 };
 
 }  // namespace robot_hardware

@@ -15,12 +15,15 @@ public:
 
   bool initialize(const std::string& i2c_device = "/dev/i2c-1", uint8_t address = 0x40);
   void cleanup();
-  bool is_initialized() const { return i2c_fd_ >= 0; }
+  bool is_initialized() const { return i2c_fd_ >= 0 && gpio_map_ != nullptr; }
 
   void set_pwm_frequency(float freq_hz);
   void set_channel_pwm(int channel, uint16_t duty);
   void set_motor_speed(int motor_index, double velocity_rad_per_sec);
   void stop_all_motors();
+  
+  // Velocity scaling parameter setter
+  bool set_max_velocity_rad_per_sec(double max_velocity);
 
 private:
   // I2C通信

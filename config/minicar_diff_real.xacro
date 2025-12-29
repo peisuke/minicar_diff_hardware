@@ -34,8 +34,13 @@
       <plugin>minicar_diff_hardware/MinicarHardwareInterface</plugin>
       <param name="wheel_radius">0.035</param>
       <param name="encoder_ticks_per_revolution">1024</param>
+      <param name="max_velocity_rad_per_sec">21.0</param>  <!-- 6V equivalent scaling for safe operation -->
       <param name="i2c_device">/dev/i2c-1</param>
       <param name="pca9685_address">64</param>
+      
+      <!-- Open-loop odometry (no encoders) -->
+      <param name="use_open_loop_odometry">true</param>     <!-- Enable open-loop estimation for /odom -->
+      <param name="open_loop_velocity_scale">1.0</param>   <!-- Scale factor for velocity correction -->
     </hardware>
     <!--
     <hardware>
@@ -45,8 +50,8 @@
 
     <joint name="left_front_wheel_joint">
       <command_interface name="velocity">
-        <param name="min">-10.0</param>
-        <param name="max">10.0</param>
+        <param name="min">-20.0</param>
+        <param name="max">20.0</param>
       </command_interface>
       <state_interface name="velocity"/>
       <state_interface name="position"/>
@@ -54,8 +59,8 @@
     
     <joint name="right_front_wheel_joint">
       <command_interface name="velocity">
-        <param name="min">-10.0</param>
-        <param name="max">10.0</param>
+        <param name="min">-20.0</param>
+        <param name="max">20.0</param>
       </command_interface>
       <state_interface name="velocity"/>
       <state_interface name="position"/>
@@ -63,8 +68,8 @@
     
     <joint name="left_rear_wheel_joint">
       <command_interface name="velocity">
-        <param name="min">-10.0</param>
-        <param name="max">10.0</param>
+        <param name="min">-20.0</param>
+        <param name="max">20.0</param>
       </command_interface>
       <state_interface name="velocity"/>
       <state_interface name="position"/>
@@ -72,8 +77,8 @@
     
     <joint name="right_rear_wheel_joint">
       <command_interface name="velocity">
-        <param name="min">-10.0</param>
-        <param name="max">10.0</param>
+        <param name="min">-20.0</param>
+        <param name="max">20.0</param>
       </command_interface>
       <state_interface name="velocity"/>
       <state_interface name="position"/>

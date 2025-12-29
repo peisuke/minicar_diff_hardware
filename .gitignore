@@ -1,0 +1,52 @@
+# ROS2 build artifacts
+build/
+install/
+log/
+
+# Python compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C++ compiled files
+*.o
+*.so
+*.dylib
+*.dll
+*.exe
+
+# CMake
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+*.cmake
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# Package-specific ignores
+*.bag
+*.db3
+
+# Hardware-specific
+*.pid
+*.lock

@@ -1,6 +1,7 @@
 #include "robot_hardware/pca9685_controller.hpp"
 
 #include <iostream>
+#include <limits>
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/ioctl.h>
@@ -175,7 +176,21 @@ void PCA9685Controller::pca9685_set_pwm(int channel, uint16_t on, uint16_t off)
 uint16_t PCA9685Controller::velocity_to_pwm_duty(double velocity_rad_per_sec)
 {
   // 速度の絶対値を0-4095のPWMデューティに変換
+  // Guard against invalid scaling to avoid division-by-zero / NaN.
+  if (!(max_velocity_rad_per_sec_ > 0.0) || !std::isfinite(max_velocity_rad_per_sec_))
+  {
+    return 0;
+  }
+
   double abs_velocity = std::abs(velocity_rad_per_sec);
+  
+  // Deadzone: 微小速度でのモーター音を防ぐため、最小閾値以下は停止
+  const double MIN_VELOCITY_THRESHOLD = 0.1; // 0.1 rad/s以下は停止
+  if (abs_velocity < MIN_VELOCITY_THRESHOLD)
+  {
+    return 0;
+  }
+  
   double normalized = std::min(abs_velocity / max_velocity_rad_per_sec_, 1.0);
   return static_cast<uint16_t>(4095 * normalized);
 }
@@ -270,6 +285,19 @@ void PCA9685Controller::gpio_write(int pin, int value)
     // Set pin LOW using GPCLR0 register  
     gpio_map_[GPCLR0] = 1 << pin;
   }
+}
+
+bool PCA9685Controller::set_max_velocity_rad_per_sec(double max_velocity)
+{
+  if (max_velocity <= 0.0) {
+    std::cerr << "Invalid max_velocity_rad_per_sec: " << max_velocity 
+              << " (must be > 0)" << std::endl;
+    return false;
+  }
+  
+  max_velocity_rad_per_sec_ = max_velocity;
+  std::cout << "Updated max_velocity_rad_per_sec to: " << max_velocity_rad_per_sec_ << std::endl;
+  return true;
 }
 
 } // namespace robot_hardware
